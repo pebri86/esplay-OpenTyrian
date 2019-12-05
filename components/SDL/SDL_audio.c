@@ -8,6 +8,8 @@ bool paused = true;
 bool locked = false;
 xSemaphoreHandle xSemaphoreAudio = NULL;
 
+static float Volume = 0.125f;
+
 IRAM_ATTR void updateTask(void *arg)
 {
   size_t bytesWritten;
@@ -28,6 +30,7 @@ void SDL_AudioInit()
 {
 	sdl_buffer = heap_caps_malloc(SAMPLECOUNT * SAMPLESIZE * 2, MALLOC_CAP_8BIT | MALLOC_CAP_DMA);
 
+#ifndef CONFIG_HW_ESPLAY_2_0
 	static const i2s_config_t i2s_config = {
 	.mode = I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN,
 	.sample_rate = SAMPLERATE,
@@ -45,7 +48,33 @@ void SDL_AudioInit()
 
 	ESP_ERROR_CHECK(i2s_set_pin(i2s_num, NULL));
 	//ESP_ERROR_CHECK(i2s_set_clk(i2s_num, SAMPLERATE, I2S_BITS_PER_SAMPLE_16BIT, I2S_CHANNEL_STEREO));
-	ESP_ERROR_CHECK(i2s_set_dac_mode(I2S_DAC_CHANNEL_BOTH_EN));	
+	ESP_ERROR_CHECK(i2s_set_dac_mode(I2S_DAC_CHANNEL_BOTH_EN));
+#else
+	 // NOTE: buffer needs to be adjusted per AUDIO_SAMPLE_RATE
+    i2s_config_t i2s_config = {
+        .mode = I2S_MODE_MASTER | I2S_MODE_TX,                                  // Only TX
+        .sample_rate = SAMPLERATE,
+        .bits_per_sample = 16,
+        .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,                           //2-channels
+        .communication_format = I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB,
+        .dma_buf_count = 6,
+        //.dma_buf_len = 1472 / 2,  // (368samples * 2ch * 2(short)) = 1472
+        .dma_buf_len = 128,  // (416samples * 2ch * 2(short)) = 1664
+        .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,                                //Interrupt level 1
+        .use_apll = false
+    };
+
+	static const int i2s_num = I2S_NUM_0; // i2s port number
+
+    i2s_driver_install(i2s_num, &i2s_config, 0, NULL);
+    i2s_pin_config_t pin_config = {
+            .bck_io_num = 26,
+            .ws_io_num = 25,
+            .data_out_num = 4,
+            .data_in_num = -1                                                       //Not used
+        };
+    i2s_set_pin(i2s_num, &pin_config);
+#endif
 }
 
 int SDL_OpenAudio(SDL_AudioSpec *desired, SDL_AudioSpec *obtained)
@@ -88,6 +117,7 @@ IRAM_ATTR int SDL_ConvertAudio(SDL_AudioCVT *cvt)
 	Sint16 *sbuf = cvt->buf;
 	Uint16 *ubuf = cvt->buf;
 
+#ifndef CONFIG_HW_ESPLAY_2_0
 	int32_t dac0;
 	int32_t dac1;
 
@@ -121,6 +151,19 @@ IRAM_ATTR int SDL_ConvertAudio(SDL_AudioCVT *cvt)
 		ubuf[i] = (int16_t)dac1;
         ubuf[i + 1] = (int16_t)dac0;
 	}
+#else
+	for (int i = cvt->len-2; i >= 0; i-=2)
+    {
+        int sample = ubuf[i] * Volume;
+        if (sample > 32767)
+            sample = 32767;
+        else if (sample < -32767)
+            sample = -32767;
+
+        ubuf[i] = (int16_t)sample;
+        ubuf[i + 1] = (int16_t)sample;
+    }
+#endif
 
 	return 0;
 }

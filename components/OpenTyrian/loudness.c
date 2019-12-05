@@ -159,7 +159,7 @@ IRAM_ATTR void audio_cb( void *user_data, unsigned char *sdl_buffer, int howmuch
 			channel_pos[ch] += qu;
 			channel_len[ch] -= qu * BYTES_PER_SAMPLE;
 			
-			/* SYN: If we've emptied a channel buffer, let's free the memory and clear the channel. */
+			//SYN: If we've emptied a channel buffer, let's free the memory and clear the channel.
 			if (channel_len[ch] == 0)
 			{
 				free(channel_buffer[ch]);

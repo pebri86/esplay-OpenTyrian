@@ -28,7 +28,24 @@ static const GPIOKeyMap keymap[2][6]={{
 	{CONFIG_HW_BUTTON_PIN_NUM_START, SDL_SCANCODE_LALT, SDLK_LALT},	
 	{CONFIG_HW_BUTTON_PIN_NUM_SELECT, SDL_SCANCODE_LCTRL, SDLK_LCTRL},		
 }};
-#else
+#elif defined CONFIG_HW_ESPLAY_2_0
+static const GPIOKeyMap keymap[2][6]={{
+// Game    
+    {CONFIG_HW_BUTTON_PIN_NUM_BUTTON1, SDL_SCANCODE_SPACE, SDLK_SPACE},     
+    {CONFIG_HW_BUTTON_PIN_NUM_BUTTON2, SDL_SCANCODE_RETURN, SDLK_RETURN},   
+    {CONFIG_HW_BUTTON_PIN_NUM_MENU, SDL_SCANCODE_ESCAPE, SDLK_ESCAPE},  
+    {CONFIG_HW_BUTTON_PIN_NUM_START, SDL_SCANCODE_LALT, SDLK_LALT}, 
+    {CONFIG_HW_BUTTON_PIN_NUM_SELECT, SDL_SCANCODE_LCTRL, SDLK_LCTRL},  
+},
+// Menu
+{
+    {CONFIG_HW_BUTTON_PIN_NUM_BUTTON1, SDL_SCANCODE_SPACE, SDLK_SPACE},     
+    {CONFIG_HW_BUTTON_PIN_NUM_BUTTON2, SDL_SCANCODE_RETURN, SDLK_RETURN},  
+    {CONFIG_HW_BUTTON_PIN_NUM_MENU, SDL_SCANCODE_ESCAPE, SDLK_ESCAPE},  
+    {CONFIG_HW_BUTTON_PIN_NUM_START, SDL_SCANCODE_LALT, SDLK_LALT}, 
+    {CONFIG_HW_BUTTON_PIN_NUM_SELECT, SDL_SCANCODE_LCTRL, SDLK_LCTRL},      
+}};
+#else 
 static const GPIOKeyMap keymap[2][6]={{
 // Game    
 	{CONFIG_HW_BUTTON_PIN_NUM_UP, SDL_SCANCODE_UP, SDLK_UP},
@@ -164,7 +181,7 @@ int SDL_PollEvent(SDL_Event * event)
     if(!initInput)
         inputInit();
 
-#ifndef CONFIG_HW_ODROID_GO
+#if !defined(CONFIG_HW_ODROID_GO) && !defined(CONFIG_HW_ESPLAY_2_0)
     GPIOEvent ev;
     if(xQueueReceive(gpio_evt_queue, &ev, 0)) {
         event->key.keysym.sym = ev.keycode;
@@ -180,7 +197,7 @@ int SDL_PollEvent(SDL_Event * event)
     return 0;
 }
 
-#ifndef CONFIG_HW_ODROID_GO
+#if !defined(CONFIG_HW_ODROID_GO) && !defined(CONFIG_HW_ESPLAY_2_0)
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
     uint32_t gpio_num = (uint32_t) arg;
@@ -224,7 +241,7 @@ void inputInit()
     io_conf.pull_up_en = 1;
     gpio_config(&io_conf);
     
-#ifndef CONFIG_HW_ODROID_GO
+#if !defined(CONFIG_HW_ODROID_GO) && !defined(CONFIG_HW_ESPLAY_2_0)
     //create a queue to handle gpio event from isr
     gpio_evt_queue = xQueueCreate(10, sizeof(GPIOEvent));
     //start gpio task

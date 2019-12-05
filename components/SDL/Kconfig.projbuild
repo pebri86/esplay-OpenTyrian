@@ -9,6 +9,9 @@ choice ESP_HARDWARE
 config HW_ODROID_GO
 	bool "ODROID-GO"
 
+config HW_ESPLAY_2_0
+	bool "ESPLAY_2_0"
+
 #config HW_WROVERKIT_V1
 #	bool "ESP_Wrover_Kit v1 (red PCB)"
 
@@ -51,6 +54,7 @@ config HW_LCD_TYPE
 	default 0 if HW_LCD_TYPE_ILI
 	default 1 if HW_LCD_TYPE_ST
 	default 0 if HW_ODROID_GO
+	default 0 if HW_ESPLAY_2_0
 
 ###############################
 
@@ -223,7 +227,7 @@ config HW_LCD_CS_GPIO
 config HW_LCD_DC_GPIO
 	int
 	default HW_LCD_DC_GPIO_CUST if HW_CUSTOM
-	default 21
+	default 12
 
 config HW_LCD_RESET_GPIO
 	int
@@ -233,7 +237,7 @@ config HW_LCD_RESET_GPIO
 config HW_LCD_BL_GPIO
 	int
 	default HW_LCD_BL_GPIO_CUST if HW_CUSTOM
-	default 14
+	default 27
 
 #####
 # SD - Hidden
@@ -302,17 +306,17 @@ config HW_BUTTON_PIN_NUM_MENU
 config HW_BUTTON_PIN_NUM_SELECT
 	int
 	default HW_BUTTON_PIN_NUM_SELECT_CUST if HW_CUSTOM
-	default 27
+	default 0
 
 config HW_BUTTON_PIN_NUM_START
 	int
 	default HW_BUTTON_PIN_NUM_START_CUST if HW_CUSTOM
-	default 39
+	default 36
 
 config HW_BUTTON_PIN_NUM_VOL
 	int
 	default HW_BUTTON_PIN_NUM_VOL_CUST if HW_CUSTOM
-	default 0
+	default -1
 
 
 endmenu

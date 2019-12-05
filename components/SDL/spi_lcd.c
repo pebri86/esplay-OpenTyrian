@@ -217,6 +217,7 @@ void ili_init(spi_device_handle_t spi)
 {
     int cmd=0;
     //Initialize non-SPI GPIOs
+    PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[PIN_NUM_DC], PIN_FUNC_GPIO);
     gpio_set_direction(PIN_NUM_DC, GPIO_MODE_OUTPUT);
     //gpio_set_direction(PIN_NUM_RST, GPIO_MODE_OUTPUT);
     if(PIN_NUM_BCKL != -1)
@@ -334,7 +335,7 @@ void IRAM_ATTR displayTask(void *arg) {
     esp_err_t ret;
     spi_bus_config_t buscfg;
     memset(&buscfg, 0, sizeof(buscfg));
-    buscfg.miso_io_num=PIN_NUM_MISO;
+    buscfg.miso_io_num=-1;
     buscfg.mosi_io_num=PIN_NUM_MOSI;
     buscfg.sclk_io_num=PIN_NUM_CLK;
     buscfg.quadwp_io_num=-1;
@@ -356,10 +357,10 @@ void IRAM_ATTR displayTask(void *arg) {
 
     SDL_LockDisplay();
     //Initialize the SPI bus
-    ret=spi_bus_initialize(CONFIG_HW_LCD_MISO_GPIO == 0 ? VSPI_HOST : HSPI_HOST, &buscfg, 1);  // DMA Channel
+    ret=spi_bus_initialize(CONFIG_HW_LCD_MISO_GPIO == -1 ? VSPI_HOST : HSPI_HOST, &buscfg, 1);  // DMA Channel
     //assert(ret==ESP_OK);
     //Attach the LCD to the SPI bus
-    ret=spi_bus_add_device(CONFIG_HW_LCD_MISO_GPIO == 0 ? VSPI_HOST : HSPI_HOST, &devcfg, &spi);
+    ret=spi_bus_add_device(CONFIG_HW_LCD_MISO_GPIO == -1 ? VSPI_HOST : HSPI_HOST, &devcfg, &spi);
     assert(ret==ESP_OK);
     //Initialize the LCD
     ili_init(spi);

@@ -8,88 +8,82 @@ bool paused = true;
 bool locked = false;
 xSemaphoreHandle xSemaphoreAudio = NULL;
 
-static float Volume = 0.125f;
-
 IRAM_ATTR void updateTask(void *arg)
 {
-  size_t bytesWritten;
-  while(1)
-  {
-	  if(!paused && /*xSemaphoreAudio != NULL*/ !locked ){
-		  //xSemaphoreTake( xSemaphoreAudio, portMAX_DELAY );
-		  memset(sdl_buffer, 0, SAMPLECOUNT*SAMPLESIZE*2);
-		  (*as.callback)(NULL, sdl_buffer, SAMPLECOUNT*SAMPLESIZE );
-		  ESP_ERROR_CHECK(i2s_write(I2S_NUM_0, sdl_buffer, SAMPLECOUNT*SAMPLESIZE*2, &bytesWritten, 500 / portTICK_PERIOD_MS));
-		  //xSemaphoreGive( xSemaphoreAudio );
-	  } else
-		  vTaskDelay( 5 );
-  }
+	size_t bytesWritten;
+	while (1)
+	{
+		if (!paused && /*xSemaphoreAudio != NULL*/ !locked)
+		{
+			//xSemaphoreTake( xSemaphoreAudio, portMAX_DELAY );
+			memset(sdl_buffer, 0, SAMPLECOUNT * SAMPLESIZE * 2);
+			(*as.callback)(NULL, sdl_buffer, SAMPLECOUNT * SAMPLESIZE);
+			ESP_ERROR_CHECK(i2s_write(I2S_NUM_0, sdl_buffer, SAMPLECOUNT * SAMPLESIZE * 2, &bytesWritten, 50 / portTICK_PERIOD_MS));
+			//xSemaphoreGive( xSemaphoreAudio );
+		}
+		else
+			vTaskDelay(5);
+	}
 }
 
 void SDL_AudioInit()
 {
 	sdl_buffer = heap_caps_malloc(SAMPLECOUNT * SAMPLESIZE * 2, MALLOC_CAP_8BIT | MALLOC_CAP_DMA);
 
-#ifndef CONFIG_HW_ESPLAY_2_0
-	static const i2s_config_t i2s_config = {
-	.mode = I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN,
-	.sample_rate = SAMPLERATE,
-	.bits_per_sample = SAMPLESIZE*8, /* the DAC module will only take the 8bits from MSB */
-	.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
-	.communication_format = I2S_COMM_FORMAT_I2S_MSB,
-	.dma_buf_count = 6,
-	.dma_buf_len = 1024,
-	.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,                                //Interrupt level 1
-    .use_apll = 0
+#ifdef CONFIG_HW_ESPLAY_MICRO
+	i2s_config_t i2s_config = {
+			.mode = I2S_MODE_MASTER | I2S_MODE_TX, // Only TX
+			.sample_rate = SAMPLERATE,
+			.bits_per_sample = SAMPLESIZE * 8,
+			.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT, //2-channels
+			.communication_format = I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB,
+			.dma_buf_count = 4,
+			//.dma_buf_len = 1472 / 2,  // (368samples * 2ch * 2(short)) = 1472
+			.dma_buf_len = 256,												// (416samples * 2ch * 2(short)) = 1664
+			.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1, //Interrupt level 1
+			.use_apll = false};
+
+	ESP_ERROR_CHECK(i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL));
+	i2s_pin_config_t pin_config = {
+			.bck_io_num = 26,
+			.ws_io_num = 25,
+			.data_out_num = 19,
+			.data_in_num = -1 //Not used
 	};
+	ESP_ERROR_CHECK(i2s_set_pin(I2S_NUM_0, &pin_config));
+#else
+	static const i2s_config_t i2s_config = {
+			.mode = I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN,
+			.sample_rate = SAMPLERATE,
+			.bits_per_sample = SAMPLESIZE * 8, /* the DAC module will only take the 8bits from MSB */
+			.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
+			.communication_format = I2S_COMM_FORMAT_I2S_MSB,
+      .dma_buf_len = 534,                       // (416samples * 2ch * 2(short)) = 1664
+      .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1, //Interrupt level 1
+			.use_apll = true};
 	static const int i2s_num = I2S_NUM_0; // i2s port number
 
-	ESP_ERROR_CHECK(i2s_driver_install(i2s_num, &i2s_config, 0, NULL));   //install and start i2s driver
+	ESP_ERROR_CHECK(i2s_driver_install(i2s_num, &i2s_config, 0, NULL)); //install and start i2s driver
 
 	ESP_ERROR_CHECK(i2s_set_pin(i2s_num, NULL));
 	//ESP_ERROR_CHECK(i2s_set_clk(i2s_num, SAMPLERATE, I2S_BITS_PER_SAMPLE_16BIT, I2S_CHANNEL_STEREO));
 	ESP_ERROR_CHECK(i2s_set_dac_mode(I2S_DAC_CHANNEL_BOTH_EN));
-#else
-	 // NOTE: buffer needs to be adjusted per AUDIO_SAMPLE_RATE
-    i2s_config_t i2s_config = {
-        .mode = I2S_MODE_MASTER | I2S_MODE_TX,                                  // Only TX
-        .sample_rate = SAMPLERATE,
-        .bits_per_sample = 16,
-        .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,                           //2-channels
-        .communication_format = I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB,
-        .dma_buf_count = 6,
-        //.dma_buf_len = 1472 / 2,  // (368samples * 2ch * 2(short)) = 1472
-        .dma_buf_len = 128,  // (416samples * 2ch * 2(short)) = 1664
-        .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,                                //Interrupt level 1
-        .use_apll = false
-    };
-
-	static const int i2s_num = I2S_NUM_0; // i2s port number
-
-    i2s_driver_install(i2s_num, &i2s_config, 0, NULL);
-    i2s_pin_config_t pin_config = {
-            .bck_io_num = 26,
-            .ws_io_num = 25,
-            .data_out_num = 4,
-            .data_in_num = -1                                                       //Not used
-        };
-    i2s_set_pin(i2s_num, &pin_config);
 #endif
 }
 
 int SDL_OpenAudio(SDL_AudioSpec *desired, SDL_AudioSpec *obtained)
 {
 	SDL_AudioInit();
-	memset(obtained, 0, sizeof(SDL_AudioSpec)); 
+	memset(obtained, 0, sizeof(SDL_AudioSpec));
 	obtained->freq = SAMPLERATE;
 	obtained->format = 16;
 	obtained->channels = 1;
 	obtained->samples = SAMPLECOUNT;
 	obtained->callback = desired->callback;
-	memcpy(&as,obtained,sizeof(SDL_AudioSpec));  
+	memcpy(&as, obtained, sizeof(SDL_AudioSpec));
 
 	//xSemaphoreAudio = xSemaphoreCreateBinary();
-	xTaskCreatePinnedToCore(&updateTask, "updateTask", 10000, NULL, 3, NULL, 1);
+	xTaskCreatePinnedToCore(&updateTask, "updateTask", 10000, NULL, 2, NULL, 1);
 	printf("audio task started\n");
 	return 0;
 }
@@ -101,8 +95,8 @@ void SDL_PauseAudio(int pause_on)
 
 void SDL_CloseAudio(void)
 {
-	  i2s_driver_uninstall(I2S_NUM_0); //stop & destroy i2s driver
-	  free(sdl_buffer);
+	i2s_driver_uninstall(I2S_NUM_0); //stop & destroy i2s driver
+	free(sdl_buffer);
 }
 
 int SDL_BuildAudioCVT(SDL_AudioCVT *cvt, Uint16 src_format, Uint8 src_channels, int src_rate, Uint16 dst_format, Uint8 dst_channels, int dst_rate)
@@ -117,13 +111,12 @@ IRAM_ATTR int SDL_ConvertAudio(SDL_AudioCVT *cvt)
 	Sint16 *sbuf = cvt->buf;
 	Uint16 *ubuf = cvt->buf;
 
-#ifndef CONFIG_HW_ESPLAY_2_0
 	int32_t dac0;
 	int32_t dac1;
 
-	for(int i = cvt->len-2; i >= 0; i-=2)
+	for (int i = cvt->len - 2; i >= 0; i -= 2)
 	{
-		Sint16 range = sbuf[i/2] >> 8; 
+		Sint16 range = sbuf[i / 2] >> 8;
 
 		// Convert to differential output
 		if (range > 127)
@@ -133,7 +126,7 @@ IRAM_ATTR int SDL_ConvertAudio(SDL_AudioCVT *cvt)
 		}
 		else if (range < -127)
 		{
-			dac1  = (range + 127);
+			dac1 = (range + 127);
 			dac0 = -127;
 		}
 		else
@@ -149,21 +142,8 @@ IRAM_ATTR int SDL_ConvertAudio(SDL_AudioCVT *cvt)
 		dac1 <<= 8;
 
 		ubuf[i] = (int16_t)dac1;
-        ubuf[i + 1] = (int16_t)dac0;
+		ubuf[i + 1] = (int16_t)dac0;
 	}
-#else
-	for (int i = cvt->len-2; i >= 0; i-=2)
-    {
-        int sample = ubuf[i] * Volume;
-        if (sample > 32767)
-            sample = 32767;
-        else if (sample < -32767)
-            sample = -32767;
-
-        ubuf[i] = (int16_t)sample;
-        ubuf[i + 1] = (int16_t)sample;
-    }
-#endif
 
 	return 0;
 }
@@ -177,8 +157,7 @@ void SDL_LockAudio(void)
 
 void SDL_UnlockAudio(void)
 {
-    locked = false;
+	locked = false;
 	//if( xSemaphoreAudio != NULL )
 	//	 xSemaphoreGive( xSemaphoreAudio );
 }
-

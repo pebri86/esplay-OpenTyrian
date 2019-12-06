@@ -10,6 +10,19 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+void system_reboot_to_firmware(void)
+{
+	const esp_partition_t *part;
+	part = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, NULL);
+	// If no factory partition found, use first ota one
+	if (part == NULL)
+		part = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, NULL);
+
+	if (part != NULL) {
+		esp_ota_set_boot_partition(part);
+	}
+	esp_restart();
+}
 
 void tyrianTask(void *pvParameters)
 {
@@ -18,6 +31,7 @@ void tyrianTask(void *pvParameters)
 
     char *argv[]={"opentyrian", NULL};
     main(1, argv);
+    system_reboot_to_firmware();
 }
 
 
